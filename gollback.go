@@ -21,6 +21,7 @@ type Gollback interface {
 type gollback struct {
 	gollbacks []AsyncFunc
 	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 type response struct {
@@ -30,23 +31,23 @@ type response struct {
 
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	out := make(chan *response, 1)
-	ctx, cancel := context.WithCancel(p.ctx)
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
 			for {
 				select {
-				case <-ctx.Done():
+				case <-p.ctx.Done():
 					return
 				default:
 					var r response
-					r.res, r.err = f(ctx)
+					r.res, r.err = f(p.ctx)
 
-					if ctx.Err() != nil {
+					if p.ctx.Err() != nil {
 						return
 					}
 
 					if r.err == nil || index == len(fns)-1 {
+						p.cancel()
 						out <- &r
 					}
 
@@ -57,7 +58,6 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	}
 
 	r := <-out
-	cancel()
 
 	return r.res, r.err
 }
@@ -92,7 +92,10 @@ func New(ctx context.Context) Gollback {
 		ctx = context.Background()
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &gollback{
-		ctx: ctx,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }

@@ -34,8 +34,8 @@ HOW TO USE
 goos: darwin
 goarch: amd64
 pkg: github.com/vardius/gollback
-BenchmarkRace-4          5000000               240 ns/op               0 B/op          0 allocs/op
-BenchmarkAll-4           1000000              2387 ns/op             464 B/op          2 allocs/op
+BenchmarkRace-4         10000000               219 ns/op               0 B/op          0 allocs/op
+BenchmarkAll-4           5000000               281 ns/op              40 B/op          1 allocs/op
 PASS
 ok      github.com/vardius/gollback     10.572s
 ```
