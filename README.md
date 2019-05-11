@@ -6,7 +6,7 @@ Vardius - gollback
 [![](https://godoc.org/github.com/vardius/gollback?status.svg)](http://godoc.org/github.com/vardius/gollback)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/vardius/gollback/blob/master/LICENSE.md)
 
-gollback - Go asynchronous function simple utilities, for managing execution of closure, callbacks.
+gollback - Go asynchronous simple function utilities, for managing execution of closures and callbacks
 
 ABOUT
 ==================================================
