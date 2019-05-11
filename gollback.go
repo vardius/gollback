@@ -9,7 +9,11 @@ type AsyncFunc func(ctx context.Context) (interface{}, error)
 
 // Gollback provides set of utility methods to easily manage asynchronous functions
 type Gollback interface {
+	// Race method returns a response as soon as one of the callbacks in an iterable resolves with the value that is not an error,
+	// otherwise last error is returned
 	Race(fns ...AsyncFunc) (interface{}, error)
+	// All method returns when all of the callbacks passed as an iterable have finished,
+	// returned responses and errors are ordered according to callback order
 	All(fns ...AsyncFunc) ([]interface{}, []error)
 }
 
@@ -25,8 +29,6 @@ type response struct {
 	index int
 }
 
-// Race method returns a response as soon as one of the callbacks in an iterable resolves with the value that is not an error,
-// otherwise last error is returned
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	out := make(chan *response, 1)
 
@@ -59,8 +61,6 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	return r.res, r.err
 }
 
-// All method returns when all of the callbacks passed as an iterable have finished,
-// returned responses and errors are ordered according to callback order
 func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 	out := make(chan *response, len(fns))
 
