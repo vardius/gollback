@@ -21,13 +21,11 @@ type Gollback interface {
 type gollback struct {
 	gollbacks []AsyncFunc
 	ctx       context.Context
-	cancel    context.CancelFunc
 }
 
 type response struct {
-	res   interface{}
-	err   error
-	index int
+	res interface{}
+	err error
 }
 
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
@@ -35,24 +33,11 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
-			for {
-				select {
-				case <-p.ctx.Done():
-					return
-				default:
-					var r response
-					r.res, r.err = f(p.ctx)
+			var r response
+			r.res, r.err = f(p.ctx)
 
-					if p.ctx.Err() != nil {
-						return
-					}
-
-					if r.err == nil || index == len(fns)-1 {
-						p.cancel()
-						out <- &r
-					}
-					return
-				}
+			if r.err == nil || index == len(fns)-1 {
+				out <- &r
 			}
 		}(i, fn)
 	}
@@ -73,29 +58,15 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 		go func(index int, f AsyncFunc) {
 			defer wg.Done()
 
-			for {
-				select {
-				case <-p.ctx.Done():
-					return
-				default:
-					var r response
-					r.res, r.err = f(p.ctx)
+			var r response
+			r.res, r.err = f(p.ctx)
 
-					if p.ctx.Err() != nil {
-						return
-					}
-
-					rs[index] = r.res
-					errs[index] = r.err
-
-					return
-				}
-			}
+			rs[index] = r.res
+			errs[index] = r.err
 		}(i, fn)
 	}
 
 	wg.Wait()
-	p.cancel()
 
 	return rs, errs
 }
@@ -106,10 +77,7 @@ func New(ctx context.Context) Gollback {
 		ctx = context.Background()
 	}
 
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-
 	return &gollback{
-		ctx:    ctxWithCancel,
-		cancel: cancel,
+		ctx: ctx,
 	}
 }
