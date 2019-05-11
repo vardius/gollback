@@ -30,19 +30,34 @@ type response struct {
 
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	out := make(chan *response, 1)
+	ctx, cancel := context.WithCancel(p.ctx)
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
-			var r response
-			r.res, r.err = f(p.ctx)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					var r response
+					r.res, r.err = f(ctx)
 
-			if r.err == nil || index == len(fns)-1 {
-				out <- &r
+					if ctx.Err() != nil {
+						return
+					}
+
+					if r.err == nil || index == len(fns)-1 {
+						out <- &r
+					}
+
+					return
+				}
 			}
 		}(i, fn)
 	}
 
 	r := <-out
+	cancel()
 
 	return r.res, r.err
 }
