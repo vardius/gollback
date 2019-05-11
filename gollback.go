@@ -2,6 +2,7 @@ package gollback
 
 import (
 	"context"
+	"sync"
 )
 
 // AsyncFunc represents asynchronous function
@@ -62,10 +63,16 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 }
 
 func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
-	out := make(chan *response, len(fns))
+	rs := make([]interface{}, len(fns))
+	errs := make([]error, len(fns))
+
+	var wg sync.WaitGroup
+	wg.Add(len(fns))
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
+			defer wg.Done()
+
 			for {
 				select {
 				case <-p.ctx.Done():
@@ -78,9 +85,8 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 						return
 					}
 
-					r.index = index
-
-					out <- &r
+					rs[index] = r.res
+					errs[index] = r.err
 
 					return
 				}
@@ -88,16 +94,7 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 		}(i, fn)
 	}
 
-	rs := make([]interface{}, len(fns))
-	errs := make([]error, len(fns))
-
-	for i := 0; i < len(fns); i++ {
-		r := <-out
-
-		rs[r.index] = r.res
-		errs[r.index] = r.err
-	}
-
+	wg.Wait()
 	p.cancel()
 
 	return rs, errs
