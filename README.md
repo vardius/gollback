@@ -93,7 +93,7 @@ import (
 func main() {
 	g := gollback.New(context.Background())
 
-	rs, errs := g.Race(
+	rs, errs := g.All(
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
