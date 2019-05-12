@@ -40,7 +40,8 @@ PASS
 ok      github.com/vardius/gollback     10.572s
 ```
 
-## Race example
+## Race
+> Race method returns a response as soon as one of the callbacks in an iterable resolves with the value that is not an error, otherwise last error is returne
 ```go
 package main
 
@@ -77,7 +78,8 @@ func main() {
 }
 ```
 
-## All example
+## All
+> All method returns when all of the callbacks passed as an iterable have finished, returned responses and errors are ordered according to callback order
 ```go
 package main
 
