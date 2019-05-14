@@ -2,9 +2,7 @@ package gollback
 
 import (
 	"context"
-	"errors"
 	"sync"
-	"time"
 )
 
 // AsyncFunc represents asynchronous function
@@ -41,14 +39,17 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 			for {
 				select {
 				case <-ctx.Done():
+					if index == len(fns)-1 {
+						cancel()
+						out <- &response{
+							err: ctx.Err(),
+						}
+					}
+
 					return
 				default:
 					var r response
 					r.res, r.err = f(ctx)
-
-					if ctx.Err() != nil {
-						return
-					}
 
 					if r.err == nil || index == len(fns)-1 {
 						cancel()
@@ -96,8 +97,6 @@ func (p *gollback) Retry(retires int, fn AsyncFunc) (interface{}, error) {
 
 	for {
 		select {
-		case <-time.After(1 * time.Second):
-			return nil, errors.New("timeout")
 		case <-p.ctx.Done():
 			return nil, p.ctx.Err()
 		default:
@@ -111,13 +110,6 @@ func (p *gollback) Retry(retires int, fn AsyncFunc) (interface{}, error) {
 			i++
 		}
 	}
-}
-
-func (p *gollback) RetryWithTimeout(retires int, duration time.Duration, fn AsyncFunc) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(p.ctx, duration)
-	defer cancel()
-
-	return fn(ctx)
 }
 
 // New creates new gollback
