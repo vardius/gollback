@@ -105,7 +105,7 @@ func main() {
 }
 ```
 
-## Retry example
+## Retry
 > Retry method retries callback given amount of times until it executes without an error, when retries = 0 it will retry infinitely
 ```go
 package main
