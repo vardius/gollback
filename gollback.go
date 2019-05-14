@@ -36,24 +36,28 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
+			c := make(chan *response, 1)
+
+			go func() {
+				var r response
+				r.res, r.err = f(ctx)
+
+				c <- &r
+			}()
+
 			for {
 				select {
 				case <-ctx.Done():
 					if index == len(fns)-1 {
-						cancel()
 						out <- &response{
 							err: ctx.Err(),
 						}
 					}
 
 					return
-				default:
-					var r response
-					r.res, r.err = f(ctx)
-
+				case r := <-c:
 					if r.err == nil || index == len(fns)-1 {
-						cancel()
-						out <- &r
+						out <- r
 					}
 
 					return

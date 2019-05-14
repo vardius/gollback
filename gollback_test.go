@@ -48,6 +48,24 @@ func TestRace(t *testing.T) {
 	}
 }
 
+func TestRaceTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	g := New(ctx)
+
+	_, err := g.Race(
+		func(ctx context.Context) (interface{}, error) {
+			time.Sleep(10 * time.Second)
+			return 1, nil
+		},
+	)
+
+	if err != ctx.Err() {
+		t.Fail()
+	}
+}
+
 func TestAll(t *testing.T) {
 	g := New(context.Background())
 	err := errors.New("failed")
