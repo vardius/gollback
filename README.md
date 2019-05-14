@@ -36,8 +36,9 @@ goarch: amd64
 pkg: github.com/vardius/gollback
 BenchmarkRace-4         10000000               219 ns/op               0 B/op          0 allocs/op
 BenchmarkAll-4           5000000               281 ns/op              40 B/op          1 allocs/op
+BenchmarkRetry-4         2000000               579 ns/op             208 B/op          3 allocs/op
 PASS
-ok      github.com/vardius/gollback     10.572s
+ok      github.com/vardius/gollback     23.742s
 ```
 
 ## Race
@@ -69,12 +70,6 @@ func main() {
 			return 3, nil
 		},
 	)
-
-	fmt.Println(r)
-	fmt.Println(err)
-	// Output:
-	// 3
-	// <nil>
 }
 ```
 
@@ -107,12 +102,38 @@ func main() {
 			return 3, nil
 		},
 	)
+}
+```
 
-	fmt.Println(rs)
-	fmt.Println(errs)
-	// Output:
-	// [1 <nil> 3]
-	// [<nil> failed <nil>]
+## Retry example
+> Retry method retries callback given amount of times until it executes without an error, when retries = 0 it will retry infinitely
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+    "github.com/vardius/gollback"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	g := gollback.New(ctx)
+
+	// Will retry infinitely until timeouts by context (after 5 seconds)
+	res, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+		return nil, errors.New("failed")
+	})
+
+	// Will retry 5 times or will timeout by context (after 5 seconds)
+	res, e := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+		return nil, errors.New("failed")
+	})
 }
 ```
 

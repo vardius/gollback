@@ -2,7 +2,9 @@ package gollback
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"time"
 )
 
 // AsyncFunc represents asynchronous function
@@ -10,18 +12,19 @@ type AsyncFunc func(ctx context.Context) (interface{}, error)
 
 // Gollback provides set of utility methods to easily manage asynchronous functions
 type Gollback interface {
-	// Race method returns a response as soon as one of the callbacks in an iterable resolves with the value that is not an error,
+	// Race method returns a response as soon as one of the callbacks in an iterable executes without an error,
 	// otherwise last error is returned
 	Race(fns ...AsyncFunc) (interface{}, error)
 	// All method returns when all of the callbacks passed as an iterable have finished,
 	// returned responses and errors are ordered according to callback order
 	All(fns ...AsyncFunc) ([]interface{}, []error)
+	// Retry method retries callback given amount of times until it executes without an error,
+	// when retries = 0 it will retry infinitely
+	Retry(retries int, fn AsyncFunc) (interface{}, error)
 }
 
 type gollback struct {
-	gollbacks []AsyncFunc
-	ctx       context.Context
-	cancel    context.CancelFunc
+	ctx context.Context
 }
 
 type response struct {
@@ -30,24 +33,25 @@ type response struct {
 }
 
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
+	ctx, cancel := context.WithCancel(p.ctx)
 	out := make(chan *response, 1)
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
 			for {
 				select {
-				case <-p.ctx.Done():
+				case <-ctx.Done():
 					return
 				default:
 					var r response
-					r.res, r.err = f(p.ctx)
+					r.res, r.err = f(ctx)
 
-					if p.ctx.Err() != nil {
+					if ctx.Err() != nil {
 						return
 					}
 
 					if r.err == nil || index == len(fns)-1 {
-						p.cancel()
+						cancel()
 						out <- &r
 					}
 
@@ -58,6 +62,7 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	}
 
 	r := <-out
+	cancel()
 
 	return r.res, r.err
 }
@@ -86,16 +91,42 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 	return rs, errs
 }
 
+func (p *gollback) Retry(retires int, fn AsyncFunc) (interface{}, error) {
+	i := 1
+
+	for {
+		select {
+		case <-time.After(1 * time.Second):
+			return nil, errors.New("timeout")
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		default:
+			var r response
+			r.res, r.err = fn(p.ctx)
+
+			if r.err == nil || i == retires {
+				return r.res, r.err
+			}
+
+			i++
+		}
+	}
+}
+
+func (p *gollback) RetryWithTimeout(retires int, duration time.Duration, fn AsyncFunc) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(p.ctx, duration)
+	defer cancel()
+
+	return fn(ctx)
+}
+
 // New creates new gollback
 func New(ctx context.Context) Gollback {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	return &gollback{
-		ctx:    ctx,
-		cancel: cancel,
+		ctx: ctx,
 	}
 }

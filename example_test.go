@@ -54,3 +54,36 @@ func Example_all() {
 	// [1 <nil> 3]
 	// [<nil> failed <nil>]
 }
+
+func Example_retry_timeout() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	g := gollback.New(ctx)
+
+	// Will retry infinitely until timeouts by context (after 5 seconds)
+	res, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+		return nil, errors.New("failed")
+	})
+
+	fmt.Println(res)
+	fmt.Println(err)
+	// Output:
+	// <nil>
+	// context deadline exceeded
+}
+
+func Example_retry_five() {
+	g := gollback.New(context.Background())
+
+	// Will retry 5 times
+	res, err := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+		return nil, errors.New("failed")
+	})
+
+	fmt.Println(res)
+	fmt.Println(err)
+	// Output:
+	// <nil>
+	// failed
+}

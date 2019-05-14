@@ -74,6 +74,48 @@ func TestAll(t *testing.T) {
 	}
 }
 
+func TestRetryTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	g := New(ctx)
+
+	// Will retry infinitely until timeouts by context (after 5 seconds)
+	_, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+		return nil, errors.New("failed")
+	})
+
+	if err != ctx.Err() {
+		t.Fail()
+	}
+}
+
+func TestRetryFail(t *testing.T) {
+	g := New(context.Background())
+	err := errors.New("failed")
+
+	// Will retry 5 times
+	_, e := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+		return nil, err
+	})
+
+	if err != e {
+		t.Fail()
+	}
+}
+
+func TestRetrySuccess(t *testing.T) {
+	g := New(context.Background())
+
+	res, _ := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+		return "success", nil
+	})
+
+	if res != "success" {
+		t.Fail()
+	}
+}
+
 func testErrorsEq(a, b []error) bool {
 	if (a == nil) != (b == nil) {
 		return false

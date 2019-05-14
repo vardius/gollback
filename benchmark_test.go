@@ -2,6 +2,7 @@ package gollback
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -21,6 +22,17 @@ func BenchmarkAll(b *testing.B) {
 	b.ResetTimer()
 
 	g.All(cbs...)
+}
+
+func BenchmarkRetry(b *testing.B) {
+	g := New(context.Background())
+	err := errors.New("failed")
+
+	b.ResetTimer()
+
+	g.Retry(b.N, func(ctx context.Context) (interface{}, error) {
+		return nil, err
+	})
 }
 
 func getCallbacks(b *testing.B) []AsyncFunc {
