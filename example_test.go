@@ -55,7 +55,7 @@ func Example_all() {
 	// [<nil> failed <nil>]
 }
 
-func Example_retry_timeout() {
+func Example_retryTimeout() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -73,7 +73,7 @@ func Example_retry_timeout() {
 	// context deadline exceeded
 }
 
-func Example_retry_five() {
+func Example_retryFiveTimes() {
 	g := gollback.New(context.Background())
 
 	// Will retry 5 times
