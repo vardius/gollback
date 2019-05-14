@@ -31,14 +31,16 @@ type response struct {
 }
 
 func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
-	ctx, cancel := context.WithCancel(p.ctx)
 	out := make(chan *response, 1)
+	ctx, cancel := context.WithCancel(p.ctx)
+	defer cancel()
 
 	for i, fn := range fns {
 		go func(index int, f AsyncFunc) {
 			c := make(chan *response, 1)
 
 			go func() {
+				defer close(c)
 				var r response
 				r.res, r.err = f(ctx)
 
@@ -67,7 +69,6 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	}
 
 	r := <-out
-	cancel()
 
 	return r.res, r.err
 }
