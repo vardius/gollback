@@ -1,4 +1,4 @@
-Vardius - gollback
+gollback
 ================
 [![Build Status](https://travis-ci.org/vardius/gollback.svg?branch=master)](https://travis-ci.org/vardius/gollback)
 [![Go Report Card](https://goreportcard.com/badge/github.com/vardius/gollback)](https://goreportcard.com/report/github.com/vardius/gollback)
