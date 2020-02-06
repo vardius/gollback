@@ -6,9 +6,11 @@ gollback
 [![](https://godoc.org/github.com/vardius/gollback?status.svg)](http://godoc.org/github.com/vardius/gollback)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/vardius/gollback/blob/master/LICENSE.md)
 
+<img align="right" height="180px" src="https://github.com/vardius/gorouter/blob/master/website/src/static/img/logo.png?raw=true" alt="logo" />
+
 gollback - Go asynchronous simple function utilities, for managing execution of closures and callbacks
 
-ABOUT
+📖 ABOUT
 ==================================================
 Contributors:
 
@@ -19,12 +21,16 @@ Want to contribute ? Feel free to send pull requests!
 Have problems, bugs, feature ideas?
 We are using the github [issue tracker](https://github.com/vardius/gollback/issues) to manage them.
 
-HOW TO USE
+## 📚 Documentation
+
+For __examples__ **visit [godoc#pkg-examples](http://godoc.org/github.com/vardius/gollback#pkg-examples)**
+
+For **GoDoc** reference, **visit [godoc.org](http://godoc.org/github.com/vardius/gollback)**
+
+🚏 HOW TO USE
 ==================================================
 
-1. [GoDoc](http://godoc.org/github.com/vardius/gollback)
-
-## Benchmark
+## 🚅 Benchmark
 **CPU: 3,3 GHz Intel Core i7**
 
 **RAM: 16 GB 2133 MHz LPDDR3**
@@ -137,9 +143,7 @@ func main() {
 }
 ```
 
-License
+📜 [License](LICENSE.md)
 -------
 
-This package is released under the MIT license. See the complete license in the package:
-
-[LICENSE](LICENSE.md)
+This package is released under the MIT license. See the complete license in the package
