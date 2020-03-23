@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/vardius/gollback.svg?branch=master)](https://travis-ci.org/vardius/gollback)
 [![Go Report Card](https://goreportcard.com/badge/github.com/vardius/gollback)](https://goreportcard.com/report/github.com/vardius/gollback)
 [![codecov](https://codecov.io/gh/vardius/gollback/branch/master/graph/badge.svg)](https://codecov.io/gh/vardius/gollback)
-[![](https://godoc.org/github.com/vardius/gollback?status.svg)](http://godoc.org/github.com/vardius/gollback)
+[![](https://godoc.org/github.com/vardius/gollback?status.svg)](https://pkg.go.dev/github.com/vardius/gollback)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/vardius/gollback/blob/master/LICENSE.md)
 
 <img align="right" height="180px" src="https://github.com/vardius/gorouter/blob/master/website/src/static/img/logo.png?raw=true" alt="logo" />
@@ -25,7 +25,7 @@ We are using the github [issue tracker](https://github.com/vardius/gollback/issu
 
 For __examples__ **visit [godoc#pkg-examples](http://godoc.org/github.com/vardius/gollback#pkg-examples)**
 
-For **GoDoc** reference, **visit [godoc.org](http://godoc.org/github.com/vardius/gollback)**
+For **GoDoc** reference, **visit [pkg.go.dev](https://pkg.go.dev/github.com/vardius/gollback)**
 
 🚏 HOW TO USE
 ==================================================
