@@ -8,31 +8,21 @@ import (
 // AsyncFunc represents asynchronous function
 type AsyncFunc func(ctx context.Context) (interface{}, error)
 
-// Gollback provides set of utility methods to easily manage asynchronous functions
-type Gollback interface {
-	// Race method returns a response as soon as one of the callbacks in an iterable executes without an error,
-	// otherwise last error is returned
-	Race(fns ...AsyncFunc) (interface{}, error)
-	// All method returns when all of the callbacks passed as an iterable have finished,
-	// returned responses and errors are ordered according to callback order
-	All(fns ...AsyncFunc) ([]interface{}, []error)
-	// Retry method retries callback given amount of times until it executes without an error,
-	// when retries = 0 it will retry infinitely
-	Retry(retries int, fn AsyncFunc) (interface{}, error)
-}
-
-type gollback struct {
-	ctx context.Context
-}
-
 type response struct {
 	res interface{}
 	err error
 }
 
-func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
+// Race method returns a response as soon as one of the callbacks in an iterable executes without an error,
+// otherwise last error is returned
+// will panic if context is nil
+func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
+	if ctx == nil {
+		panic("nil context provided")
+	}
+
 	out := make(chan *response, 1)
-	ctx, cancel := context.WithCancel(p.ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	for i, fn := range fns {
@@ -73,7 +63,14 @@ func (p *gollback) Race(fns ...AsyncFunc) (interface{}, error) {
 	return r.res, r.err
 }
 
-func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
+// All method returns when all of the callbacks passed as an iterable have finished,
+// returned responses and errors are ordered according to callback order
+// will panic if context is nil
+func All(ctx context.Context, fns ...AsyncFunc) ([]interface{}, []error) {
+	if ctx == nil {
+		panic("nil context provided")
+	}
+
 	rs := make([]interface{}, len(fns))
 	errs := make([]error, len(fns))
 
@@ -85,7 +82,7 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 			defer wg.Done()
 
 			var r response
-			r.res, r.err = f(p.ctx)
+			r.res, r.err = f(ctx)
 
 			rs[index] = r.res
 			errs[index] = r.err
@@ -97,16 +94,23 @@ func (p *gollback) All(fns ...AsyncFunc) ([]interface{}, []error) {
 	return rs, errs
 }
 
-func (p *gollback) Retry(retires int, fn AsyncFunc) (interface{}, error) {
+// Retry method retries callback given amount of times until it executes without an error,
+// when retries = 0 it will retry infinitely
+// will panic if context is nil
+func Retry(ctx context.Context, retires int, fn AsyncFunc) (interface{}, error) {
+	if ctx == nil {
+		panic("nil context provided")
+	}
+
 	i := 1
 
 	for {
 		select {
-		case <-p.ctx.Done():
-			return nil, p.ctx.Err()
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		default:
 			var r response
-			r.res, r.err = fn(p.ctx)
+			r.res, r.err = fn(ctx)
 
 			if r.err == nil || i == retires {
 				return r.res, r.err
@@ -114,16 +118,5 @@ func (p *gollback) Retry(retires int, fn AsyncFunc) (interface{}, error) {
 
 			i++
 		}
-	}
-}
-
-// New creates new gollback
-func New(ctx context.Context) Gollback {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	return &gollback{
-		ctx: ctx,
 	}
 }

@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	gollback "github.com/vardius/gollback"
+	"github.com/vardius/gollback"
 )
 
 func Example_race() {
-	g := gollback.New(context.Background())
-
-	r, err := g.Race(
+	r, err := gollback.Race(
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -33,9 +32,8 @@ func Example_race() {
 }
 
 func Example_all() {
-	g := gollback.New(context.Background())
-
-	rs, errs := g.All(
+	rs, errs := gollback.All(
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -59,10 +57,8 @@ func Example_retryTimeout() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	g := gollback.New(ctx)
-
 	// Will retry infinitely until timeouts by context (after 5 seconds)
-	res, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+	res, err := gollback.Retry(ctx, 0, func(ctx context.Context) (interface{}, error) {
 		return nil, errors.New("failed")
 	})
 
@@ -74,10 +70,8 @@ func Example_retryTimeout() {
 }
 
 func Example_retryFiveTimes() {
-	g := gollback.New(context.Background())
-
 	// Will retry 5 times
-	res, err := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+	res, err := gollback.Retry(context.Background(), 5, func(ctx context.Context) (interface{}, error) {
 		return nil, errors.New("failed")
 	})
 

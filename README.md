@@ -40,11 +40,11 @@ For **GoDoc** reference, **visit [pkg.go.dev](https://pkg.go.dev/github.com/vard
 goos: darwin
 goarch: amd64
 pkg: github.com/vardius/gollback
-BenchmarkRace-4    	  500000	      2961 ns/op	     668 B/op	       5 allocs/op
-BenchmarkAll-4     	 5000000	       273 ns/op	      40 B/op	       1 allocs/op
-BenchmarkRetry-4   	200000000	         6.68 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRace-4    	  566022	      2608 ns/op	     663 B/op	       5 allocs/op
+BenchmarkAll-4     	 5052489	       241 ns/op	      42 B/op	       1 allocs/op
+BenchmarkRetry-4   	206430384	         5.93 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/vardius/gollback	32.418s
+ok  	github.com/vardius/gollback	31.741s
 ```
 
 ## Race
@@ -58,13 +58,12 @@ import (
 	"fmt"
 	"time"
 
-        "github.com/vardius/gollback"
+    "github.com/vardius/gollback"
 )
 
 func main() {
-	g := gollback.New(context.Background())
-
-	r, err := g.Race(
+	r, err := gollback.Race(
+        context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -90,13 +89,12 @@ import (
 	"fmt"
 	"time"
 
-        "github.com/vardius/gollback"
+    "github.com/vardius/gollback"
 )
 
 func main() {
-	g := gollback.New(context.Background())
-
-	rs, errs := g.All(
+	rs, errs := gollback.All(
+        context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -122,22 +120,20 @@ import (
 	"fmt"
 	"time"
 
-        "github.com/vardius/gollback"
+    "github.com/vardius/gollback"
 )
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	g := gollback.New(ctx)
-
 	// Will retry infinitely until timeouts by context (after 5 seconds)
-	res, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+	res, err := gollback.Retry(ctx, 0, func(ctx context.Context) (interface{}, error) {
 		return nil, errors.New("failed")
 	})
 
 	// Will retry 5 times or will timeout by context (after 5 seconds)
-	res, e := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+	res, err := gollback.Retry(ctx, 5, func(ctx context.Context) (interface{}, error) {
 		return nil, errors.New("failed")
 	})
 }

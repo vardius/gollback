@@ -7,30 +7,27 @@ import (
 )
 
 func BenchmarkRace(b *testing.B) {
-	g := New(context.Background())
 	cbs := getCallbacks(b)
 
 	b.ResetTimer()
 
-	g.Race(cbs...)
+	Race(context.Background(), cbs...)
 }
 
 func BenchmarkAll(b *testing.B) {
-	g := New(context.Background())
 	cbs := getCallbacks(b)
 
 	b.ResetTimer()
 
-	g.All(cbs...)
+	All(context.Background(), cbs...)
 }
 
 func BenchmarkRetry(b *testing.B) {
-	g := New(context.Background())
 	err := errors.New("failed")
 
 	b.ResetTimer()
 
-	g.Retry(b.N, func(ctx context.Context) (interface{}, error) {
+	Retry(context.Background(), b.N, func(ctx context.Context) (interface{}, error) {
 		return nil, err
 	})
 }

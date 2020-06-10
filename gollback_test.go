@@ -7,26 +7,9 @@ import (
 	"time"
 )
 
-func TestNew(t *testing.T) {
-	g := New(nil)
-
-	if g == nil {
-		t.Fail()
-	}
-}
-
-func TestNewWithContext(t *testing.T) {
-	g := New(context.Background())
-
-	if g == nil {
-		t.Fail()
-	}
-}
-
 func TestRace(t *testing.T) {
-	g := New(context.Background())
-
-	r, err := g.Race(
+	r, err := Race(
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -52,9 +35,8 @@ func TestRaceTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	g := New(ctx)
-
-	_, err := g.Race(
+	_, err := Race(
+		ctx,
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(10 * time.Second)
 			return 1, nil
@@ -67,10 +49,10 @@ func TestRaceTimeout(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
-	g := New(context.Background())
 	err := errors.New("failed")
 
-	rs, errs := g.All(
+	rs, errs := All(
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -96,10 +78,8 @@ func TestRetryTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	g := New(ctx)
-
 	// Will retry infinitely until timeouts by context (after 5 seconds)
-	_, err := g.Retry(0, func(ctx context.Context) (interface{}, error) {
+	_, err := Retry(ctx, 0, func(ctx context.Context) (interface{}, error) {
 		return nil, errors.New("failed")
 	})
 
@@ -109,11 +89,10 @@ func TestRetryTimeout(t *testing.T) {
 }
 
 func TestRetryFail(t *testing.T) {
-	g := New(context.Background())
 	err := errors.New("failed")
 
 	// Will retry 5 times
-	_, e := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+	_, e := Retry(context.Background(), 5, func(ctx context.Context) (interface{}, error) {
 		return nil, err
 	})
 
@@ -123,9 +102,7 @@ func TestRetryFail(t *testing.T) {
 }
 
 func TestRetrySuccess(t *testing.T) {
-	g := New(context.Background())
-
-	res, _ := g.Retry(5, func(ctx context.Context) (interface{}, error) {
+	res, _ := Retry(context.Background(), 5, func(ctx context.Context) (interface{}, error) {
 		return "success", nil
 	})
 
