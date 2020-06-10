@@ -63,7 +63,7 @@ import (
 
 func main() {
 	r, err := gollback.Race(
-        context.Background(),
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
@@ -94,7 +94,7 @@ import (
 
 func main() {
 	rs, errs := gollback.All(
-        context.Background(),
+		context.Background(),
 		func(ctx context.Context) (interface{}, error) {
 			time.Sleep(3 * time.Second)
 			return 1, nil
