@@ -31,6 +31,24 @@ func TestRace(t *testing.T) {
 	}
 }
 
+func TestRaceNilContext(t *testing.T) {
+	assertPanic(t, "nil context provided", func() {
+		_, _ = Race(
+			nil,
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(3 * time.Second)
+				return 1, nil
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return nil, errors.New("failed")
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return 3, nil
+			},
+		)
+	})
+}
+
 func TestRaceTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -74,6 +92,24 @@ func TestAll(t *testing.T) {
 	}
 }
 
+func TestAllNilContext(t *testing.T) {
+	assertPanic(t, "nil context provided", func() {
+		_, _ = All(
+			nil,
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(3 * time.Second)
+				return 1, nil
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return nil, errors.New("failed")
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return 3, nil
+			},
+		)
+	})
+}
+
 func TestRetryTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -86,6 +122,16 @@ func TestRetryTimeout(t *testing.T) {
 	if err != ctx.Err() {
 		t.Fail()
 	}
+}
+
+func TestRetryNilContext(t *testing.T) {
+	err := errors.New("failed")
+
+	assertPanic(t, "nil context provided", func() {
+		_, _ = Retry(nil, 5, func(ctx context.Context) (interface{}, error) {
+			return nil, err
+		})
+	})
 }
 
 func TestRetryFail(t *testing.T) {
@@ -145,4 +191,29 @@ func testResponsesEq(a, b []interface{}) bool {
 	}
 
 	return true
+}
+
+// assertPanic asserts if a function panics with an expected message
+func assertPanic(t *testing.T, expected interface{}, f func()) {
+	didPanic := false
+	var message interface{}
+
+	func() {
+		defer func() {
+			if message = recover(); message != nil {
+				didPanic = true
+			}
+		}()
+
+		// call the target function
+		f()
+	}()
+
+	if !didPanic {
+		t.Fatal("Did not panic")
+	}
+
+	if message != expected {
+		t.Fatalf("Unexpected panic\nExpected: %q\nActual: %q", expected, message)
+	}
 }
