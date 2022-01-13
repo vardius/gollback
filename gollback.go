@@ -2,8 +2,11 @@ package gollback
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
+
+var ErrNoCallbacks = errors.New("no callback to run")
 
 // AsyncFunc represents asynchronous function
 type AsyncFunc func(ctx context.Context) (interface{}, error)
@@ -13,49 +16,65 @@ type response struct {
 	err error
 }
 
-// Race method returns a response as soon as one of the callbacks in an iterable executes without an error,
+// Race method returns a response as soon as one of the callbacks executes without an error,
 // otherwise last error is returned
 // will panic if context is nil
 func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
 	if ctx == nil {
 		panic("nil context provided")
 	}
+	if len(fns) == 0 {
+		return nil, ErrNoCallbacks
+	}
 
-	out := make(chan *response, 1)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	for i, fn := range fns {
-		go func(index int, f AsyncFunc) {
-			c := make(chan *response, 1)
+	out := make(chan *response, 1)
+	defer close(out)
+	responses := make(chan *response, len(fns))
+	defer close(responses)
 
-			go func() {
-				defer close(c)
-				var r response
-				r.res, r.err = f(ctx)
-
-				c <- &r
-			}()
-
-			for {
-				select {
-				case <-ctx.Done():
-					if index == len(fns)-1 {
-						out <- &response{
-							err: ctx.Err(),
-						}
+	var responded bool
+	var lock sync.Mutex
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				lock.Lock()
+				if !responded {
+					responded = true
+					out <- &response{
+						err: ctx.Err(),
 					}
-
-					return
-				case r := <-c:
-					if r.err == nil || index == len(fns)-1 {
-						out <- r
-					}
-
+					lock.Unlock()
 					return
 				}
+				lock.Unlock()
+			case r, more := <-responses:
+				lock.Lock()
+				if !more || (!responded && r.err == nil) {
+					responded = true
+					out <- r
+					lock.Unlock()
+					return
+				}
+				lock.Unlock()
 			}
-		}(i, fn)
+		}
+	}()
+
+	for _, fn := range fns {
+		go func(f AsyncFunc) {
+			var r response
+			r.res, r.err = f(ctx)
+
+			lock.Lock()
+			defer lock.Unlock()
+			if !responded {
+				responses <- &r
+			}
+		}(fn)
 	}
 
 	r := <-out
@@ -63,7 +82,7 @@ func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
 	return r.res, r.err
 }
 
-// All method returns when all of the callbacks passed as an iterable have finished,
+// All method returns when all the callbacks passed as an iterable have finished,
 // returned responses and errors are ordered according to callback order
 // will panic if context is nil
 func All(ctx context.Context, fns ...AsyncFunc) ([]interface{}, []error) {
