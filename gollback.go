@@ -37,6 +37,7 @@ func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
 
 	var responded bool
 	var lock sync.Mutex
+	var errCount int
 	go func() {
 		for {
 			select {
@@ -53,7 +54,7 @@ func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
 				lock.Unlock()
 			case r, more := <-responses:
 				lock.Lock()
-				if !more || (!responded && r.err == nil) {
+				if !more || (!responded && r.err == nil) || (errCount == len(fns)) {
 					responded = true
 					out <- r
 					lock.Unlock()
@@ -71,6 +72,9 @@ func Race(ctx context.Context, fns ...AsyncFunc) (interface{}, error) {
 
 			lock.Lock()
 			defer lock.Unlock()
+			if r.err != nil {
+				errCount ++
+			}
 			if !responded {
 				responses <- &r
 			}

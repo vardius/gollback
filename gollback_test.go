@@ -69,6 +69,19 @@ func TestRace(t *testing.T) {
 				return nil, errors.New("failed")
 			},
 		}},
+		{name: "all functions errors and return last err", want: nil, wantErr: true, fns: []AsyncFunc{
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(3 * time.Second)
+				return nil, errors.New("failed")
+			},
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(2 * time.Second)
+				return nil, errors.New("failed")
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return nil, errors.New("failed")
+			},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
