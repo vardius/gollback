@@ -16,6 +16,19 @@ func TestRace(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "no callback", want: nil, wantErr: true, fns: []AsyncFunc{}},
+		{name: "does not return error", want: 1, wantErr: false, fns: []AsyncFunc{
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(time.Second)
+				return 1, nil
+			},
+			func(ctx context.Context) (interface{}, error) {
+				time.Sleep(time.Second)
+				return 1, nil
+			},
+			func(ctx context.Context) (interface{}, error) {
+				return nil, errors.New("failed")
+			},
+		}},
 		{name: "first non error wins", want: 3, wantErr: false, fns: []AsyncFunc{
 			func(ctx context.Context) (interface{}, error) {
 				time.Sleep(3 * time.Second)
