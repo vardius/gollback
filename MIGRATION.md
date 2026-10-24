@@ -60,6 +60,9 @@ implement, or `any` if you really want v1's behaviour back.
 
 - **Race, when every function fails,** returns all of their errors joined with `errors.Join`, in the order of
   the functions. v1 returned one of them. Check for a particular error with `errors.Is` or `errors.As`.
+- **Race, when ctx is done first,** returns ctx's error joined with the errors of the functions that had
+  failed by then. `errors.Is(err, context.Canceled)` still works; comparing with `==` doesn't once one has
+  failed. If ctx is done before the call, v2 calls no function.
 - **Retry, when ctx is done,** returns ctx's error joined with the function's last error, so you can see why
   the attempts failed. `errors.Is(err, context.DeadlineExceeded)` still works; comparing with `==` doesn't.
   If ctx is done before the first call, the error is ctx's alone, as before.
@@ -67,6 +70,6 @@ implement, or `any` if you really want v1's behaviour back.
   and v1's All kept whatever a failed function returned. v2 returns the zero value with every error.
 - **All runs the first function on the calling goroutine,** and the others on goroutines of their own,
   as before. A panic in the first function now reaches the caller, where it can be recovered.
-- **A nil context is no longer checked.** v1 panicked with "nil context provided". v2's Race panics in
-  `context.WithCancel`, and All and Retry hand the nil context to your functions. Pass `context.Background()`
+- **A nil context is no longer checked.** v1 panicked with "nil context provided". v2's Race and Retry
+  panic on it, and All hands it to your functions. Pass `context.Background()`
   or `context.TODO()` instead; `go vet` and staticcheck flag a nil context.

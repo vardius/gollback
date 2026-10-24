@@ -40,7 +40,7 @@ goroutine, so `All` of one function no longer starts a goroutine at all.
 
 <Aside title="Where the allocations go">
 `Retry` allocates nothing. `All` allocates the two slices it returns and, for more than one function, the state its
-goroutines share. `Race` allocates its state, the context it cancels, and that context's channel.
+goroutines share. `Race` allocates its state, the context it cancels, that context's cancel func, and its channel.
 Beyond that, each goroutine costs one small allocation: the Go runtime's, for the arguments of a `go` statement.
 Handing work to long-lived goroutines through a shared queue would avoid it, but measured five times slower once
 many callers race at the same time, so gollback pays it.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -170,6 +171,92 @@ func TestRaceParentDone(t *testing.T) {
 	})
 }
 
+func TestRaceParentDoneJoinsFailures(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+
+		_, err := gollback.Race(ctx, after(0, 0, errA), after(time.Hour, 1, nil))
+
+		if want := "context deadline exceeded\na failed"; errString(err) != want {
+			t.Errorf("Race() error = %q, want %q", err, want)
+		}
+		waitForLosers()
+	})
+}
+
+func TestRaceParentDoneWinsOverFailuresItCaused(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		// Fails once ctx is done, with an error that doesn't say why.
+		stopped := func(ctx context.Context) (int, error) {
+			<-ctx.Done()
+			return 0, errA
+		}
+
+		_, err := gollback.Race(ctx, stopped, stopped)
+
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Race() error = %v, want %v", err, context.DeadlineExceeded)
+		}
+	})
+}
+
+func TestRaceParentDoneBeforeTheCall(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		var called atomic.Bool
+		_, err := gollback.Race(ctx, func(context.Context) (int, error) {
+			called.Store(true)
+			return 1, nil
+		})
+		if err != context.Canceled {
+			t.Errorf("Race() error = %v, want %v itself", err, context.Canceled)
+		}
+		synctest.Wait()
+		if called.Load() {
+			t.Error("fn called after ctx was done")
+		}
+	})
+}
+
+func TestRaceKeepsTheFirstWinner(t *testing.T) {
+	// The second fn succeeds as soon as the first has won, racing Race to report.
+	late := func(ctx context.Context) (int, error) {
+		<-ctx.Done()
+		return 2, nil
+	}
+	for range 1000 {
+		got, err := gollback.Race(t.Context(), succeed, late)
+		if got != 1 || err != nil {
+			t.Fatalf("Race() = %d, %v, want 1, nil", got, err)
+		}
+	}
+}
+
+func TestRaceFnThatExits(t *testing.T) {
+	exits := func(context.Context) (int, error) {
+		runtime.Goexit()
+		return 1, nil
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		got, err := gollback.Race(t.Context(), exits, after(time.Second, 2, nil))
+		if got != 2 || err != nil {
+			t.Errorf("Race() = %d, %v, want 2, nil", got, err)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		_, err := gollback.Race(t.Context(), exits)
+		if want := "gollback: callback exited without returning"; errString(err) != want {
+			t.Errorf("Race() error = %q, want %q", err, want)
+		}
+	})
+}
+
 func TestRacePassesParentValues(t *testing.T) {
 	type key struct{}
 	ctx := context.WithValue(t.Context(), key{}, "value")
@@ -186,15 +273,16 @@ func TestAll(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		start := time.Now()
 		results, errs := gollback.All(t.Context(),
+			after(0, 4, errA), // the caller's goroutine runs it; its result is dropped: it failed
 			after(3*time.Second, 1, nil),
-			after(0, 2, errB), // its result is dropped: it failed
+			after(0, 2, errB),
 			after(time.Second, 3, nil),
 		)
 
-		if want := []int{1, 0, 3}; !slices.Equal(results, want) {
+		if want := []int{0, 1, 0, 3}; !slices.Equal(results, want) {
 			t.Errorf("All() results = %v, want %v", results, want)
 		}
-		if want := []error{nil, errB, nil}; !slices.Equal(errs, want) {
+		if want := []error{errA, nil, errB, nil}; !slices.Equal(errs, want) {
 			t.Errorf("All() errs = %v, want %v", errs, want)
 		}
 		if elapsed := time.Since(start); elapsed != 3*time.Second {
@@ -222,6 +310,20 @@ func TestAllRunsConcurrently(t *testing.T) {
 			t.Errorf("All() results = %v, want %v", results, want)
 		}
 	})
+}
+
+func TestAllFnThatExits(t *testing.T) {
+	results, errs := gollback.All(t.Context(), succeed, func(context.Context) (int, error) {
+		runtime.Goexit()
+		return 2, nil
+	})
+
+	if want := []int{1, 0}; !slices.Equal(results, want) {
+		t.Errorf("All() results = %v, want %v", results, want)
+	}
+	if want := "gollback: callback exited without returning"; errs[0] != nil || errString(errs[1]) != want {
+		t.Errorf("All() errs = %v, want [<nil> %s]", errs, want)
+	}
 }
 
 func TestAllPassesCtx(t *testing.T) {

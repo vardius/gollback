@@ -18,7 +18,8 @@
 // Race returns its result and cancels the context the others were given. It doesn't wait for them,
 // so a function that ignores its context keeps running after Race returns, and its result is dropped.
 // If every function fails, Race returns their errors joined with errors.Join, in the order of the functions.
-// If the context passed to Race is done first, Race returns its error.
+// If the context passed to Race is done first, Race returns its error, joined with the errors of
+// the functions that had failed by then.
 //
 // # All
 //
@@ -36,7 +37,7 @@
 // # Cost
 //
 // Retry allocates nothing. All allocates the two slices it returns and, for more than one function,
-// the state its goroutines share. Race allocates its state, the context it cancels, and that context's
-// channel. Starting a goroutine with arguments costs one small allocation; the package pays it rather
+// the state its goroutines share. Race allocates its state, the context it cancels, that context's
+// cancel func, and its channel. Starting a goroutine with arguments costs one small allocation; the package pays it rather
 // than funnel work through a shared queue, which is slower once many callers race at the same time.
 package gollback

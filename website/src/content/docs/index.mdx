@@ -42,11 +42,11 @@ import { comparison } from '../../data/benchmarks';
 		place.
 	</Card>
 	<Card title="Lean" icon="rocket">
-		`Retry` allocates nothing, `All` runs the first function on your goroutine, and tests count every
-		allocation.
+		`Retry` allocates nothing, `All` runs the first function on your goroutine, and tests guard the
+		allocation counts.
 	</Card>
 	<Card title="Deterministic tests" icon="check">
-		Tested on a fake clock with `testing/synctest`: exact timings, no sleeps, 100% coverage.
+		Tested on a fake clock with `testing/synctest`: timings are exact and nothing waits for real. 100% coverage.
 	</Card>
 	<Card title="Small API" icon="puzzle">
 		Three functions and one type. Nothing to configure and no dependencies beyond the standard library.

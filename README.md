@@ -11,7 +11,7 @@ Run Go functions concurrently and get typed results back.
 - **All** waits for every function and returns each result and error, in order.
 - **Retry** calls a function until it succeeds, runs out of attempts, or its context is done.
 - **Typed.** Generic functions return a `T`, not an `interface{}`: no type assertions.
-- **Lean.** `Retry` allocates nothing, `All` runs the first function on your goroutine, and tests guard every allocation count.
+- **Lean.** `Retry` allocates nothing, `All` runs the first function on your goroutine, and tests guard the allocation counts.
 
 📖 **[Documentation](https://vardius.github.io/gollback/)** · [API reference](https://pkg.go.dev/github.com/vardius/gollback/v2) · [Examples](examples) · [Migrating from v1](MIGRATION.md)
 

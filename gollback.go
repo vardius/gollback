@@ -9,6 +9,9 @@ import (
 // ErrNoCallbacks is what Race returns when it is given no functions to run.
 var ErrNoCallbacks = errors.New("gollback: no callbacks to run")
 
+// errExited is the error of a fn that ended its goroutine with runtime.Goexit instead of returning.
+var errExited = errors.New("gollback: callback exited without returning")
+
 // AsyncFunc is a function that Race, All and Retry call. It should return once ctx is done.
 type AsyncFunc[T any] func(ctx context.Context) (T, error)
 
@@ -16,34 +19,44 @@ type AsyncFunc[T any] func(ctx context.Context) (T, error)
 // Once one succeeds, the context passed to the others is cancelled, and Race returns without waiting for them.
 //
 // If every fn fails, Race returns their errors joined, in the order of fns.
-// If ctx is done first, Race returns ctx's error. With no fns, it returns ErrNoCallbacks.
+// If ctx is done first, Race returns ctx's error, joined with the errors of the fns that had failed by then;
+// if ctx is done before the call, no fn is called. With no fns, Race returns ErrNoCallbacks.
+// A fn that calls runtime.Goexit counts as failed.
 func Race[T any](ctx context.Context, fns ...AsyncFunc[T]) (T, error) {
 	var zero T
 	if len(fns) == 0 {
 		return zero, ErrNoCallbacks
 	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	raceCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Taken before the fns start, so the channel is made on every call; a fn that won first would
+	// leave none to make, and the allocations per call would depend on timing.
+	done := raceCtx.Done()
 
-	r := &race[T]{ctx: ctx, cancel: cancel, fns: fns, pending: len(fns)}
+	r := &race[T]{ctx: raceCtx, cancel: cancel, fns: fns, pending: len(fns)}
 	for i := range fns {
 		go r.run(i)
 	}
 
-	// Closed by the winner, by the last fn to fail, or by the parent.
-	<-ctx.Done()
+	// Closed by the winner, by the last fn to fail, or by ctx.
+	<-done
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	switch {
-	case r.won:
+	if r.won {
 		return r.value, nil
-	case r.pending == 0:
-		return zero, errors.Join(r.errs...)
-	default:
-		return zero, ctx.Err()
 	}
+	if err := ctx.Err(); err != nil {
+		if r.errs == nil {
+			return zero, err
+		}
+		return zero, errors.Join(append([]error{err}, r.errs...)...)
+	}
+	return zero, errors.Join(r.errs...)
 }
 
 type race[T any] struct {
@@ -59,8 +72,13 @@ type race[T any] struct {
 }
 
 func (r *race[T]) run(i int) {
-	v, err := r.fns[i](r.ctx)
+	var v T
+	err := errExited // replaced when fns[i] returns
+	defer func() { r.finish(i, v, err) }()
+	v, err = r.fns[i](r.ctx)
+}
 
+func (r *race[T]) finish(i int, v T, err error) {
 	r.mu.Lock()
 	r.pending--
 	decided := false
@@ -86,6 +104,7 @@ func (r *race[T]) run(i int) {
 // results[i] and errs[i] are what fns[i] returned: results[i] is the zero value when errs[i] is not nil.
 //
 // The first fn runs on the calling goroutine and each of the others on its own.
+// One of the others that calls runtime.Goexit counts as failed.
 func All[T any](ctx context.Context, fns ...AsyncFunc[T]) (results []T, errs []error) {
 	results = make([]T, len(fns))
 	errs = make([]error, len(fns))
@@ -119,6 +138,7 @@ type all[T any] struct {
 
 func (a *all[T]) run(i int) {
 	defer a.wg.Done()
+	a.errs[i] = errExited // replaced when fns[i] returns
 	a.results[i], a.errs[i] = settle(a.fns[i](a.ctx))
 }
 

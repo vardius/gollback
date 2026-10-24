@@ -13,7 +13,11 @@ The same three functions, now generic. See [MIGRATION.md](MIGRATION.md) for the 
 
 - Module path is `github.com/vardius/gollback/v2`; Go 1.26 or newer is required.
 - `Race` returns every error, joined in the order of the functions, when they all fail.
+- `Race` returns ctx's error joined with the errors of the functions that had failed when ctx is done first,
+  and calls no function when ctx is done before the call.
 - `Retry` returns ctx's error joined with the function's last error when ctx is done first.
+- A function that calls `runtime.Goexit`, as `t.FailNow` does, counts as failed in `Race`, and in `All`
+  for every function but the first, which runs on the calling goroutine.
 - A failed call's result is dropped: `Race` and `Retry` return the zero value with an error,
   and `All` leaves `results[i]` zero when `errs[i]` is set.
 - `All` runs the first function on the calling goroutine.

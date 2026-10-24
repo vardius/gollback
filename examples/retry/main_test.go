@@ -59,7 +59,7 @@ func TestGetWithBackoffStopsWaitingWhenCtxIsDone(t *testing.T) {
 
 	// With an hour's pause, only ctx can end the wait.
 	_, err := getWithBackoff(ctx, http.DefaultClient, srv.URL, 5, time.Hour)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("getWithBackoff() error = %v, want %v", err, context.DeadlineExceeded)
+	if !errors.Is(err, context.DeadlineExceeded) || !strings.HasSuffix(err.Error(), "503 Service Unavailable") {
+		t.Errorf("getWithBackoff() error = %v, want %v joined with the last 503", err, context.DeadlineExceeded)
 	}
 }

@@ -18,19 +18,21 @@ import (
 // getWithBackoff makes up to attempts requests. Before each retry it waits, doubling the pause every time,
 // and stops waiting as soon as ctx is done.
 func getWithBackoff(ctx context.Context, client *http.Client, url string, attempts int, pause time.Duration) (string, error) {
-	first := true
+	var last error // the previous request's
 	return gollback.Retry(ctx, attempts, func(ctx context.Context) (string, error) {
-		if !first {
+		if last != nil {
 			select {
 			case <-time.After(pause):
 				pause *= 2
 			case <-ctx.Done():
-				return "", ctx.Err()
+				// Retry joins ctx's error with this one, so the reason for retrying isn't lost.
+				return "", last
 			}
 		}
-		first = false
 
-		return get(ctx, client, url)
+		body, err := get(ctx, client, url)
+		last = err
+		return body, err
 	})
 }
 
