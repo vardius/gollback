@@ -1,145 +1,110 @@
-⚙️ gollback
-================
-[![Build Status](https://travis-ci.org/vardius/gollback.svg?branch=master)](https://travis-ci.org/vardius/gollback)
-[![Go Report Card](https://goreportcard.com/badge/github.com/vardius/gollback)](https://goreportcard.com/report/github.com/vardius/gollback)
-[![codecov](https://codecov.io/gh/vardius/gollback/branch/master/graph/badge.svg)](https://codecov.io/gh/vardius/gollback)
-[![](https://godoc.org/github.com/vardius/gollback?status.svg)](https://pkg.go.dev/github.com/vardius/gollback)
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/vardius/gollback/blob/master/LICENSE.md)
+# ⚙️ gollback
 
-<img align="right" height="180px" src="https://github.com/vardius/gorouter/blob/master/website/src/static/img/logo.png?raw=true" alt="logo" />
+[![Test](https://github.com/vardius/gollback/actions/workflows/test.yml/badge.svg)](https://github.com/vardius/gollback/actions/workflows/test.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/vardius/gollback/v2.svg)](https://pkg.go.dev/github.com/vardius/gollback/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vardius/gollback/v2)](https://goreportcard.com/report/github.com/vardius/gollback/v2)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-gollback - Go asynchronous simple function utilities, for managing execution of closures and callbacks
+Run Go functions concurrently and get typed results back.
 
-📖 ABOUT
-==================================================
-Contributors:
+- **Race** returns the first result without an error and cancels the rest.
+- **All** waits for every function and returns each result and error, in order.
+- **Retry** calls a function until it succeeds, runs out of attempts, or its context is done.
+- **Typed.** Generic functions return a `T`, not an `interface{}`: no type assertions.
+- **Lean.** `Retry` allocates nothing, `All` runs the first function on your goroutine, and tests guard every allocation count.
 
-* [Rafał Lorenz](http://rafallorenz.com)
+📖 **[Documentation](https://vardius.github.io/gollback/)** · [API reference](https://pkg.go.dev/github.com/vardius/gollback/v2) · [Examples](examples) · [Migrating from v1](MIGRATION.md)
 
-Want to contribute ? Feel free to send pull requests!
+## Install
 
-Have problems, bugs, feature ideas?
-We are using the github [issue tracker](https://github.com/vardius/gollback/issues) to manage them.
-
-## 📚 Documentation
-
-For __examples__ **visit [godoc#pkg-examples](http://godoc.org/github.com/vardius/gollback#pkg-examples)**
-
-For **GoDoc** reference, **visit [pkg.go.dev](https://pkg.go.dev/github.com/vardius/gollback)**
-
-🚏 HOW TO USE
-==================================================
-
-## 🚅 Benchmark
-**CPU: 3,3 GHz Intel Core i7**
-
-**RAM: 16 GB 2133 MHz LPDDR3**
-
-```bash
-➜  gollback git:(master) ✗ go test -bench=. -cpu=4 -benchmem
-goos: darwin
-goarch: amd64
-pkg: github.com/vardius/gollback
-BenchmarkRace-4    	  566022	      2608 ns/op	     663 B/op	       5 allocs/op
-BenchmarkAll-4     	 5052489	       241 ns/op	      42 B/op	       1 allocs/op
-BenchmarkRetry-4   	206430384	         5.93 ns/op	       0 B/op	       0 allocs/op
-PASS
-ok  	github.com/vardius/gollback	31.741s
+```sh
+go get github.com/vardius/gollback/v2
 ```
 
+Requires Go 1.26 or newer.
+
 ## Race
-> Race method returns a response as soon as one of the callbacks in an iterable resolves with the value that is not an error, otherwise last error is returne
+
+The first function to return a nil error wins, and the context the others were given is cancelled.
+Race doesn't wait for them. If every function fails, it returns all their errors, joined in order.
+
 ```go
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"time"
-
-	"github.com/vardius/gollback"
+user, err := gollback.Race(ctx,
+	func(ctx context.Context) (User, error) { return primary.User(ctx, id) },
+	func(ctx context.Context) (User, error) { return replica.User(ctx, id) },
 )
-
-func main() {
-	r, err := gollback.Race(
-		context.Background(),
-		func(ctx context.Context) (interface{}, error) {
-			time.Sleep(3 * time.Second)
-			return 1, nil
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return nil, errors.New("failed")
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return 3, nil
-		},
-	)
-}
 ```
 
 ## All
-> All method returns when all of the callbacks passed as an iterable have finished, returned responses and errors are ordered according to callback order
+
+Every function runs at once; All returns when the last one does. `results[i]` and `errs[i]` are what the i-th function returned,
+and a failed function's result is the zero value.
+
 ```go
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"time"
-
-	"github.com/vardius/gollback"
+prices, errs := gollback.All(ctx,
+	func(ctx context.Context) (Price, error) { return shopA.Price(ctx, sku) },
+	func(ctx context.Context) (Price, error) { return shopB.Price(ctx, sku) },
 )
-
-func main() {
-	rs, errs := gollback.All(
-		context.Background(),
-		func(ctx context.Context) (interface{}, error) {
-			time.Sleep(3 * time.Second)
-			return 1, nil
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return nil, errors.New("failed")
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return 3, nil
-		},
-	)
-}
 ```
 
 ## Retry
-> Retry method retries callback given amount of times until it executes without an error, when retries = 0 it will retry infinitely
+
+Calls the function until it succeeds, it has been called `attempts` times, or ctx is done. Below 1 attempt means no limit.
+When ctx ends it, the error is ctx's joined with the function's last one.
+
 ```go
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"time"
-
-	"github.com/vardius/gollback"
-)
-
-func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Will retry infinitely until timeouts by context (after 5 seconds)
-	res, err := gollback.Retry(ctx, 0, func(ctx context.Context) (interface{}, error) {
-		return nil, errors.New("failed")
-	})
-
-	// Will retry 5 times or will timeout by context (after 5 seconds)
-	res, err := gollback.Retry(ctx, 5, func(ctx context.Context) (interface{}, error) {
-		return nil, errors.New("failed")
-	})
-}
+cfg, err := gollback.Retry(ctx, 5, func(ctx context.Context) (Config, error) {
+	return store.Load(ctx, "app")
+})
 ```
 
-📜 [License](LICENSE.md)
--------
+Retry calls again at once. To back off between attempts, wait in the function: see [examples/retry](examples/retry/main.go).
 
-This package is released under the MIT license. See the complete license in the package
+## Benchmarks
+
+Time and allocations per call, on an Apple M4 Max with Go 1.27.0, median of 5 runs. Both versions ran on the same harness,
+with functions that return at once; in a race, one wins and the others wait to be cancelled.
+Run v2's own suite with `go test -bench .`.
+
+| Scenario | v1 | v2 |
+| --- | ---: | ---: |
+| Race, 1 function | 795 ns · 13 allocs | **349 ns · 4 allocs** |
+| Race, 4 functions | 2.05 µs · 22 allocs | **1.43 µs · 7 allocs** |
+| Race, 4 functions, all fail | 2.34 µs · 22 allocs | **1.17 µs · 11 allocs** |
+| Race, 4 functions, 16 callers at once | 435 ns · 22 allocs | **296 ns · 7 allocs** |
+| All, 1 function | 293 ns · 5 allocs | **17.7 ns · 2 allocs** |
+| All, 4 functions | 1.04 µs · 11 allocs | **759 ns · 6 allocs** |
+| All, 4 functions, 16 callers at once | 316 ns · 11 allocs | **190 ns · 6 allocs** |
+| Retry, 5 failed attempts | 25.4 ns · 0 allocs | **14.1 ns · 0 allocs** |
+
+Beyond its own state, each goroutine costs one small allocation, the runtime's, for a `go` statement's arguments.
+Handing work to pooled goroutines would avoid it, but measured five times slower with many callers at once.
+
+## Upgrading from v1
+
+The functions are the same, now generic:
+
+```go
+// v1
+res, err := gollback.Race(ctx,
+	func(ctx context.Context) (interface{}, error) { return primary.User(ctx, id) },
+	func(ctx context.Context) (interface{}, error) { return replica.User(ctx, id) },
+)
+user := res.(User)
+
+// v2
+user, err := gollback.Race(ctx,
+	func(ctx context.Context) (User, error) { return primary.User(ctx, id) },
+	func(ctx context.Context) (User, error) { return replica.User(ctx, id) },
+)
+```
+
+[MIGRATION.md](MIGRATION.md) maps every v1 call to its v2 form and lists the behaviour changes.
+
+## Contributing
+
+Bug reports and pull requests are welcome: see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+
+## License
+
+MIT, see [LICENSE.md](LICENSE.md).
