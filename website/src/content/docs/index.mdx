@@ -1,0 +1,134 @@
+---
+title: Race, All and Retry for Go
+description: Run Go functions concurrently and get typed results back. Race returns the first to succeed and cancels the rest, All waits for every one, and Retry calls one until it succeeds.
+template: splash
+hero:
+  title: Concurrent calls, <span class="accent">typed</span> results
+  tagline: Run Go functions at once and get what they return, typed. The first to succeed wins a Race and cancels the rest, All waits for each one, and Retry calls one until it succeeds.
+  actions:
+    - text: Get started
+      link: getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/vardius/gollback
+      icon: github
+      variant: minimal
+---
+
+import { CardGrid, Card, LinkButton, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import BenchmarkChart from '../../components/BenchmarkChart.astro';
+import Stats from '../../components/Stats.astro';
+import { comparison } from '../../data/benchmarks';
+
+<Stats />
+
+<div class="landing-section">
+
+<p class="eyebrow">Features</p>
+
+## What you get
+
+<CardGrid>
+	<Card title="Typed results" icon="approve-check">
+		An `AsyncFunc[T]` returns a `T`, so `Race` and `Retry` return one and `All` returns a `[]T`. No
+		`interface{}`, no type assertions.
+	</Card>
+	<Card title="Cancellation built in" icon="close">
+		Every function gets a context. The moment one wins a race, the others' context is cancelled, so
+		their requests stop.
+	</Card>
+	<Card title="Every error kept" icon="warning">
+		When every racer fails, you get all their errors joined. `All` returns each function's error in its
+		place.
+	</Card>
+	<Card title="Lean" icon="rocket">
+		`Retry` allocates nothing, `All` runs the first function on your goroutine, and tests count every
+		allocation.
+	</Card>
+	<Card title="Deterministic tests" icon="check">
+		Tested on a fake clock with `testing/synctest`: exact timings, no sleeps, 100% coverage.
+	</Card>
+	<Card title="Small API" icon="puzzle">
+		Three functions and one type. Nothing to configure and no dependencies beyond the standard library.
+	</Card>
+</CardGrid>
+
+</div>
+
+<div class="landing-section">
+
+<p class="eyebrow">Performance</p>
+
+## Faster than v1, with a third of the allocations
+
+<p class="landing-lead">
+	v2 starts one goroutine per function and nothing else, keeps results in one place instead of passing them
+	through channels, and never allocates to retry. Racing one function went from 795 ns to 349 ns.
+</p>
+
+<Tabs syncKey="fn">
+<TabItem label="Race">
+<BenchmarkChart title="Time per call to Race" rows={comparison.race} />
+</TabItem>
+<TabItem label="All">
+<BenchmarkChart title="Time per call to All" rows={comparison.all} />
+</TabItem>
+<TabItem label="Retry">
+<BenchmarkChart title="Time per call to Retry" rows={comparison.retry} />
+</TabItem>
+</Tabs>
+
+<LinkCard title="How these were measured" href="benchmarks/" description="Methodology, the full v2 suite, and how to run it yourself." />
+
+</div>
+
+<div class="landing-section">
+
+<p class="eyebrow">Upgrading</p>
+
+## Coming from v1
+
+<p class="landing-lead">
+	The functions are the same. They are generic now, so the type assertions go, and a few edge cases changed:
+	all errors when every racer fails, and no results beside errors.
+</p>
+
+<div class="compare">
+
+```go title="v1"
+res, err := gollback.Race(ctx,
+	func(ctx context.Context) (interface{}, error) {
+		return primary.User(ctx, id)
+	},
+	func(ctx context.Context) (interface{}, error) {
+		return replica.User(ctx, id)
+	},
+)
+user := res.(User)
+```
+
+```go title="v2"
+user, err := gollback.Race(ctx,
+	func(ctx context.Context) (User, error) {
+		return primary.User(ctx, id)
+	},
+	func(ctx context.Context) (User, error) {
+		return replica.User(ctx, id)
+	},
+)
+```
+
+</div>
+
+<LinkCard title="Migration guide" href="migrating-from-v1/" description="Every v1 call and its v2 form, and the behaviour changes to know about." />
+
+</div>
+
+<div class="cta not-content">
+	<h2>Race your first requests in five minutes</h2>
+	<p>Install the module, hand Race two functions, and get the faster answer. The guide walks through All and Retry too.</p>
+	<div class="cta-actions">
+		<LinkButton href="getting-started/" icon="right-arrow">Get started</LinkButton>
+		<LinkButton href="race/" variant="minimal">Read the docs</LinkButton>
+	</div>
+</div>

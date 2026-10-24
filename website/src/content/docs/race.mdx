@@ -1,0 +1,72 @@
+---
+title: Race
+description: Run functions concurrently and return the first result without an error, cancelling the rest.
+---
+
+import { Aside, Code } from '@astrojs/starlight/components';
+import example from '../../../../examples/race/main.go?raw';
+
+```go
+func Race[T any](ctx context.Context, fns ...AsyncFunc[T]) (T, error)
+```
+
+Race starts every function in its own goroutine and returns the first result that comes with a nil error.
+Use it when several sources can answer the same question and you want the fastest good answer:
+replicas of a database, mirrors of a file, regions of a service.
+
+```go
+user, err := gollback.Race(ctx,
+	func(ctx context.Context) (User, error) { return primary.User(ctx, id) },
+	func(ctx context.Context) (User, error) { return replica.User(ctx, id) },
+)
+```
+
+## Who wins
+
+The first function to return a **nil error** wins. A function that fails doesn't end the race:
+the others keep going, and the first of them to succeed still wins.
+
+Race returns as soon as there is a winner. It doesn't wait for the others.
+
+## The losers are cancelled
+
+Every function gets a context derived from the one you pass. When a function wins, Race cancels that
+context, so the others' requests, queries and timers stop. A function that respects its context returns
+early with `context.Canceled`; Race has already returned, and that result is dropped.
+
+<Aside type="caution" title="A function that ignores its context keeps running">
+Race doesn't wait for the losers, so one that never looks at its context runs to the end in the background.
+Pass the context to everything that blocks: `http.NewRequestWithContext`, `db.QueryContext`, a `select` on `ctx.Done()`.
+</Aside>
+
+## When every function fails
+
+If no function succeeds, Race returns the zero value and all of their errors, joined with
+[`errors.Join`](https://pkg.go.dev/errors#Join) in the order of the functions, not the order they failed in.
+Look for a particular one with `errors.Is` or `errors.As`:
+
+```go
+_, err := gollback.Race(ctx, fromCache, fromDatabase)
+if errors.Is(err, sql.ErrNoRows) {
+	// at least one source says there is no such row
+}
+```
+
+With no functions at all, Race returns `ErrNoCallbacks`.
+
+## When your context is done first
+
+If the context you passed is cancelled, or its deadline passes, before any function succeeds,
+Race returns that context's error at once and the functions see their context cancelled too.
+Give a race a deadline the same way you give one to a request:
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+defer cancel()
+
+user, err := gollback.Race(ctx, fromPrimary, fromReplica)
+```
+
+## Example: the fastest mirror
+
+<Code code={example} lang="go" title="examples/race/main.go" />

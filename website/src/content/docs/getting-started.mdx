@@ -1,0 +1,77 @@
+---
+title: Getting started
+description: Install gollback, race two requests, and see what each of its three functions is for.
+---
+
+import { Code, LinkCard, CardGrid, Steps } from '@astrojs/starlight/components';
+import race from '../../../../examples/race/main.go?raw';
+
+gollback runs Go functions concurrently and hands back what they return. It has three functions:
+
+- **Race** runs them all and returns the first result without an error, cancelling the rest.
+- **All** runs them all and returns every result and every error, in order.
+- **Retry** calls one until it succeeds, runs out of attempts, or its context is done.
+
+## Install
+
+gollback needs Go 1.26 or newer.
+
+```sh
+go get github.com/vardius/gollback/v2
+```
+
+## Your first race
+
+This program asks several mirrors for the same file and prints whichever answers first.
+Each function makes one request, with the context Race gives it, so the slower requests are cancelled
+as soon as one succeeds:
+
+<Code code={race} lang="go" title="examples/race/main.go" />
+
+## Run it
+
+<Steps>
+
+1. From a clone of the repository, race two URLs:
+
+   ```sh
+   go run ./examples/race 'https://go.dev/VERSION?m=text' 'https://golang.google.cn/VERSION?m=text'
+   ```
+
+   Both serve the same file, the latest Go version; it prints whichever answers first.
+
+2. Give it a URL that fails and one that works. The failure doesn't end the race:
+
+   ```sh
+   go run ./examples/race https://go.dev/no-such-page 'https://go.dev/VERSION?m=text'
+   ```
+
+3. Give it only failing URLs. Race returns every error, one per line, in the order of the URLs:
+
+   ```sh
+   go run ./examples/race https://go.dev/no-such-page https://go.dev/nor-this-one
+   ```
+
+   ```txt
+   https://go.dev/no-such-page: 404 Not Found
+   https://go.dev/nor-this-one: 404 Not Found
+   ```
+
+</Steps>
+
+## What just happened
+
+- Each URL became an `AsyncFunc[string]`: a function that takes a context and returns a `string` and an error.
+  The type parameter is the result's type, so `Race` returns a `string`, not an `interface{}`.
+- `Race` started every function in its own goroutine. The first to return a nil error won.
+- When one won, Race cancelled the context the others had, so their requests stopped.
+- When every function failed, Race returned all their errors, joined with `errors.Join`.
+
+## Next steps
+
+<CardGrid>
+	<LinkCard title="Race" href="../race/" description="The first success wins: losers, errors and cancellation in detail." />
+	<LinkCard title="All" href="../all/" description="Run every function and get each result and error in order." />
+	<LinkCard title="Retry" href="../retry/" description="Call a function until it succeeds, with backoff if you want it." />
+	<LinkCard title="Benchmarks" href="../benchmarks/" description="What each call costs, and how v2 compares with v1." />
+</CardGrid>

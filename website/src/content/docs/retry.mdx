@@ -1,0 +1,54 @@
+---
+title: Retry
+description: Call a function until it succeeds, runs out of attempts, or its context is done, with optional backoff.
+---
+
+import { Aside, Code } from '@astrojs/starlight/components';
+import example from '../../../../examples/retry/main.go?raw';
+
+```go
+func Retry[T any](ctx context.Context, attempts int, fn AsyncFunc[T]) (T, error)
+```
+
+Retry calls `fn` until it returns a nil error, it has been called `attempts` times, or `ctx` is done.
+It runs `fn` on your goroutine and allocates nothing.
+
+```go
+cfg, err := gollback.Retry(ctx, 5, func(ctx context.Context) (Config, error) {
+	return store.Load(ctx, "app")
+})
+```
+
+## Attempts
+
+`attempts` is the most times `fn` is called, the first call included. Below 1 means no limit:
+Retry calls `fn` until it succeeds or `ctx` is done, so give it a context with a deadline.
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+defer cancel()
+
+conn, err := gollback.Retry(ctx, 0, dial) // as many attempts as fit in 30 seconds
+```
+
+## Errors
+
+- When `fn` never succeeds, Retry returns its last error.
+- When `ctx` is done first, Retry returns `ctx`'s error joined with `fn`'s last error, so you can see both why it
+  stopped and why the attempts failed. `errors.Is(err, context.DeadlineExceeded)` is true.
+- When `ctx` is done before the first call, `fn` is never called and the error is `ctx`'s alone.
+
+Retry checks `ctx` before every call, and passes it to `fn`, which should return early once it is done.
+
+## Waiting between attempts
+
+Retry calls `fn` again as soon as it fails. That suits a function that waits by itself, such as one that blocks
+on a lock or a connection, but most retries against a service should back off.
+Wait at the start of every attempt but the first, and stop waiting when the context is done:
+
+<Code code={example} lang="go" title="examples/retry/main.go" />
+
+<Aside type="caution">
+Only retry calls that are safe to repeat. A request that charges a card or sends a message may have
+succeeded before it failed, and a retry would do it twice.
+</Aside>

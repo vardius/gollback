@@ -1,0 +1,71 @@
+---
+title: All
+description: Run functions concurrently, wait for all of them, and get each one's result and error in order.
+---
+
+import { Aside, Code } from '@astrojs/starlight/components';
+import example from '../../../../examples/all/main.go?raw';
+
+```go
+func All[T any](ctx context.Context, fns ...AsyncFunc[T]) (results []T, errs []error)
+```
+
+All runs every function concurrently and returns when the last one does.
+Use it to fan out independent work, such as several requests or lookups, and collect every answer.
+
+```go
+prices, errs := gollback.All(ctx,
+	func(ctx context.Context) (Price, error) { return shopA.Price(ctx, sku) },
+	func(ctx context.Context) (Price, error) { return shopB.Price(ctx, sku) },
+	func(ctx context.Context) (Price, error) { return shopC.Price(ctx, sku) },
+)
+```
+
+## Results and errors, in order
+
+`results` and `errs` have one entry per function, in the order you passed them:
+`results[i]` and `errs[i]` are what the i-th function returned. When `errs[i]` isn't nil, `results[i]` is the zero value,
+so a failed call's result can't be mistaken for a real one.
+
+```go
+for i, err := range errs {
+	if err != nil {
+		log.Printf("shop %d: %v", i, err)
+		continue
+	}
+	use(prices[i])
+}
+```
+
+All never stops early: one function failing doesn't affect the others. To get a single error, join them:
+`errors.Join(errs...)` is nil when every function succeeded.
+
+## Where the functions run
+
+The first function runs on the goroutine that called All, and each of the others on a goroutine of its own,
+so they all run at the same time. A panic in the first one reaches your goroutine, where you can recover it.
+
+<Aside title="Stopping the others when one fails">
+All doesn't cancel anything. If the other calls are pointless once one fails, give them a context you cancel,
+and cancel it from a wrapper when a function fails:
+
+```go
+func cancelOnError[T any](cancel context.CancelFunc, fn gollback.AsyncFunc[T]) gollback.AsyncFunc[T] {
+	return func(ctx context.Context) (T, error) {
+		v, err := fn(ctx)
+		if err != nil {
+			cancel()
+		}
+		return v, err
+	}
+}
+
+ctx, cancel := context.WithCancel(ctx)
+defer cancel()
+results, errs := gollback.All(ctx, cancelOnError(cancel, a), cancelOnError(cancel, b))
+```
+</Aside>
+
+## Example: checking URLs
+
+<Code code={example} lang="go" title="examples/all/main.go" />

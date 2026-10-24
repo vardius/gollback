@@ -1,0 +1,64 @@
+---
+title: Benchmarks
+description: What each gollback call costs, how v2 compares with v1, and how to measure it yourself.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import BenchmarkChart from '../../components/BenchmarkChart.astro';
+import BenchmarkSuite from '../../components/BenchmarkSuite.astro';
+import { comparison, suite } from '../../data/benchmarks';
+
+These numbers measure gollback alone: the functions return at once, so what's left is the cost of starting goroutines,
+collecting results and cancelling. Your functions will dominate a real call; the point is that gollback adds as little as possible.
+
+In every race, one function wins at once and the others wait to be cancelled, as the slower replicas of a real
+request do.
+
+## v2 against v1
+
+Both versions ran on the same harness, with the same functions.
+
+<Tabs syncKey="fn">
+<TabItem label="Race">
+<BenchmarkChart title="Time per call to Race" rows={comparison.race} />
+</TabItem>
+<TabItem label="All">
+<BenchmarkChart title="Time per call to All" rows={comparison.all} />
+</TabItem>
+<TabItem label="Retry">
+<BenchmarkChart title="Time per call to Retry" rows={comparison.retry} />
+</TabItem>
+</Tabs>
+
+v1 started a goroutine to collect each race and sent every result through a channel; v2 starts one goroutine per
+function and nothing else, and keeps results in one place behind a lock. `All` runs its first function on your
+goroutine, so `All` of one function no longer starts a goroutine at all.
+
+## v2's own suite
+
+<BenchmarkSuite rows={suite} />
+
+<Aside title="Where the allocations go">
+`Retry` allocates nothing. `All` allocates the two slices it returns and, for more than one function, the state its
+goroutines share. `Race` allocates its state, the context it cancels, and that context's channel.
+Beyond that, each goroutine costs one small allocation: the Go runtime's, for the arguments of a `go` statement.
+Handing work to long-lived goroutines through a shared queue would avoid it, but measured five times slower once
+many callers race at the same time, so gollback pays it.
+</Aside>
+
+## Run them yourself
+
+From a clone of the repository:
+
+```sh
+go test -run '^$' -bench . -benchmem
+```
+
+To compare two versions, run each a few times and compare with [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat):
+
+```sh
+go test -run '^$' -bench . -count 10 > new.txt
+benchstat old.txt new.txt
+```
+
+The allocation counts are also enforced by tests: `TestAllocations` fails if a call allocates more than it should.
