@@ -6,78 +6,84 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/vardius/gollback"
+	"github.com/vardius/gollback/v2"
 )
 
-func Example_race() {
-	r, err := gollback.Race(
-		context.Background(),
-		func(ctx context.Context) (interface{}, error) {
-			time.Sleep(3 * time.Second)
-			return 1, nil
+func ExampleRace() {
+	// Ask two replicas for the same thing: the first good answer wins, and the other is cancelled.
+	answer, err := gollback.Race(context.Background(),
+		func(ctx context.Context) (string, error) {
+			return "", errors.New("replica a: unavailable")
 		},
-		func(ctx context.Context) (interface{}, error) {
-			return nil, errors.New("failed")
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return 3, nil
+		func(ctx context.Context) (string, error) {
+			return "answer from replica b", nil
 		},
 	)
 
-	fmt.Println(r)
-	fmt.Println(err)
-	// Output:
-	// 3
-	// <nil>
+	fmt.Println(answer, err)
+	// Output: answer from replica b <nil>
 }
 
-func Example_all() {
-	rs, errs := gollback.All(
-		context.Background(),
-		func(ctx context.Context) (interface{}, error) {
-			time.Sleep(3 * time.Second)
-			return 1, nil
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return nil, errors.New("failed")
-		},
-		func(ctx context.Context) (interface{}, error) {
-			return 3, nil
-		},
+func ExampleRace_allFail() {
+	_, err := gollback.Race(context.Background(),
+		func(ctx context.Context) (string, error) { return "", errors.New("replica a: unavailable") },
+		func(ctx context.Context) (string, error) { return "", errors.New("replica b: timeout") },
 	)
 
-	fmt.Println(rs)
+	// Every error, in the order of the fns.
+	fmt.Println(err)
+	// Output:
+	// replica a: unavailable
+	// replica b: timeout
+}
+
+func ExampleAll() {
+	price := func(item string, cents int, err error) gollback.AsyncFunc[int] {
+		return func(ctx context.Context) (int, error) { return cents, err }
+	}
+
+	prices, errs := gollback.All(context.Background(),
+		price("tea", 450, nil),
+		price("cake", 0, errors.New("cake: out of stock")),
+		price("coffee", 500, nil),
+	)
+
+	fmt.Println(prices)
 	fmt.Println(errs)
 	// Output:
-	// [1 <nil> 3]
-	// [<nil> failed <nil>]
+	// [450 0 500]
+	// [<nil> cake: out of stock <nil>]
 }
 
-func Example_retryTimeout() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func ExampleRetry() {
+	calls := 0
+	flaky := func(ctx context.Context) (string, error) {
+		if calls++; calls < 3 {
+			return "", fmt.Errorf("call %d: connection reset", calls)
+		}
+		return "ok", nil
+	}
+
+	res, err := gollback.Retry(context.Background(), 5, flaky)
+
+	fmt.Println(res, err, "after", calls, "calls")
+	// Output: ok <nil> after 3 calls
+}
+
+func ExampleRetry_timeout() {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	// Will retry infinitely until timeouts by context (after 5 seconds)
-	res, err := gollback.Retry(ctx, 0, func(ctx context.Context) (interface{}, error) {
-		return nil, errors.New("failed")
+	// 0 attempts: no limit, so only ctx stops it.
+	_, err := gollback.Retry(ctx, 0, func(ctx context.Context) (string, error) {
+		time.Sleep(10 * time.Millisecond)
+		return "", errors.New("connection refused")
 	})
 
-	fmt.Println(res)
+	fmt.Println(errors.Is(err, context.DeadlineExceeded))
 	fmt.Println(err)
 	// Output:
-	// <nil>
+	// true
 	// context deadline exceeded
-}
-
-func Example_retryFiveTimes() {
-	// Will retry 5 times
-	res, err := gollback.Retry(context.Background(), 5, func(ctx context.Context) (interface{}, error) {
-		return nil, errors.New("failed")
-	})
-
-	fmt.Println(res)
-	fmt.Println(err)
-	// Output:
-	// <nil>
-	// failed
+	// connection refused
 }

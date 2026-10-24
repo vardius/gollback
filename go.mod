@@ -1,3 +1,3 @@
-module github.com/vardius/gollback
+module github.com/vardius/gollback/v2
 
-go 1.14
+go 1.26.0
