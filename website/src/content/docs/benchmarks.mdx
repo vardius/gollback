@@ -12,7 +12,8 @@ These numbers measure gollback alone: the functions return at once, so what's le
 collecting results and cancelling. Your functions will dominate a real call; the point is that gollback adds as little as possible.
 
 In every race, one function wins at once and the others wait to be cancelled, as the slower replicas of a real
-request do.
+request do. With 16 callers or goroutines at once, the time is wall time per call across all of them, so it measures
+throughput, not the latency of one call.
 
 ## v2 against v1
 
@@ -42,8 +43,8 @@ goroutine, so `All` of one function no longer starts a goroutine at all.
 `Retry` allocates nothing. `All` allocates the two slices it returns and, for more than one function, the state its
 goroutines share. `Race` allocates its state, the context it cancels, that context's cancel func, and its channel.
 Beyond that, each goroutine costs one small allocation: the Go runtime's, for the arguments of a `go` statement.
-Handing work to long-lived goroutines through a shared queue would avoid it, but measured five times slower once
-many callers race at the same time, so gollback pays it.
+Handing work to long-lived goroutines through a shared queue would avoid it, but a prototype that did was slower
+once many callers raced at the same time, so gollback pays it.
 </Aside>
 
 ## Run them yourself

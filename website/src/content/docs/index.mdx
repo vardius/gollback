@@ -45,7 +45,7 @@ import { comparison } from '../../data/benchmarks';
 		`Retry` allocates nothing, `All` runs the first function on your goroutine, and tests guard the
 		allocation counts.
 	</Card>
-	<Card title="Deterministic tests" icon="check">
+	<Card title="Deterministic tests" icon="clock">
 		Tested on a fake clock with `testing/synctest`: timings are exact and nothing waits for real. 100% coverage.
 	</Card>
 	<Card title="Small API" icon="puzzle">
@@ -59,12 +59,13 @@ import { comparison } from '../../data/benchmarks';
 
 <p class="eyebrow">Performance</p>
 
-## Faster than v1, with a third of the allocations
+## Faster than v1, with fewer allocations
 
-<p class="landing-lead">
+<div class="landing-lead">
 	v2 starts one goroutine per function and nothing else, keeps results in one place instead of passing them
-	through channels, and never allocates to retry. Racing one function went from 795 ns to 349 ns.
-</p>
+	through channels, and never allocates to retry. Racing one function went from 762 ns to 348 ns.
+	With 16 callers at once, the time is wall time per call across all of them, so it measures throughput.
+</div>
 
 <Tabs syncKey="fn">
 <TabItem label="Race">
@@ -88,10 +89,10 @@ import { comparison } from '../../data/benchmarks';
 
 ## Coming from v1
 
-<p class="landing-lead">
+<div class="landing-lead">
 	The functions are the same. They are generic now, so the type assertions go, and a few edge cases changed:
 	all errors when every racer fails, and no results beside errors.
-</p>
+</div>
 
 <div class="compare">
 

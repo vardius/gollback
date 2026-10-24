@@ -21,8 +21,8 @@ The same three functions, now generic. See [MIGRATION.md](MIGRATION.md) for the 
 - A failed call's result is dropped: `Race` and `Retry` return the zero value with an error,
   and `All` leaves `results[i]` zero when `errs[i]` is set.
 - `All` runs the first function on the calling goroutine.
-- Faster, with fewer allocations. Racing one function went from 795 ns and 13 allocations to 349 ns and 4;
-  `All` of one function from 293 ns to 18 ns; `Retry` from 25 ns to 14 ns, still allocating nothing.
+- Faster, with fewer allocations. Racing one function went from 762 ns and 13 allocations to 348 ns and 5;
+  `All` of one function from 285 ns to 15 ns; `Retry` from 25 ns to 13 ns, still allocating nothing.
   Allocation counts are guarded by tests.
 
 ### Removed

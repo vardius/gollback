@@ -64,21 +64,22 @@ Retry calls again at once. To back off between attempts, wait in the function: s
 
 Time and allocations per call, on an Apple M4 Max with Go 1.27.0, median of 5 runs. Both versions ran on the same harness,
 with functions that return at once; in a race, one wins and the others wait to be cancelled.
+With 16 callers at once, the time is wall time per call across all of them, so it measures throughput.
 Run v2's own suite with `go test -bench .`.
 
 | Scenario | v1 | v2 |
 | --- | ---: | ---: |
-| Race, 1 function | 795 ns · 13 allocs | **349 ns · 4 allocs** |
-| Race, 4 functions | 2.05 µs · 22 allocs | **1.43 µs · 7 allocs** |
-| Race, 4 functions, all fail | 2.34 µs · 22 allocs | **1.17 µs · 11 allocs** |
-| Race, 4 functions, 16 callers at once | 435 ns · 22 allocs | **296 ns · 7 allocs** |
-| All, 1 function | 293 ns · 5 allocs | **17.7 ns · 2 allocs** |
-| All, 4 functions | 1.04 µs · 11 allocs | **759 ns · 6 allocs** |
-| All, 4 functions, 16 callers at once | 316 ns · 11 allocs | **190 ns · 6 allocs** |
-| Retry, 5 failed attempts | 25.4 ns · 0 allocs | **14.1 ns · 0 allocs** |
+| Race, 1 function | 762 ns · 13 allocs | **348 ns · 5 allocs** |
+| Race, 4 functions | 1.95 µs · 22 allocs | **1.35 µs · 8 allocs** |
+| Race, 4 functions, all fail | 2.19 µs · 22 allocs | **1.08 µs · 11 allocs** |
+| Race, 4 functions, 16 callers at once | 446 ns · 22 allocs | **284 ns · 8 allocs** |
+| All, 1 function | 285 ns · 5 allocs | **15.2 ns · 2 allocs** |
+| All, 4 functions | 950 ns · 11 allocs | **719 ns · 6 allocs** |
+| All, 4 functions, 16 callers at once | 313 ns · 11 allocs | **191 ns · 6 allocs** |
+| Retry, 5 failed attempts | 24.6 ns · 0 allocs | **13.4 ns · 0 allocs** |
 
 Beyond its own state, each goroutine costs one small allocation, the runtime's, for a `go` statement's arguments.
-Handing work to pooled goroutines would avoid it, but measured five times slower with many callers at once.
+Handing work to pooled goroutines would avoid it, but a prototype that did was slower with many callers at once.
 
 ## Upgrading from v1
 
